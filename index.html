@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPACE SHOOTER: Petualangan Tata Surya</title>
+<style>
+  :root{
+    --navy:#050b1f; --navy2:#0b1636; --navy3:#12224d;
+    --blue:#2f6bff; --cyan:#22d3ee; --purple:#8b5cf6;
+    --green:#22c55e; --red:#ef4444; --amber:#fbbf24; --white:#fff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:100%;height:100%;overflow:hidden;background:var(--navy);color:var(--white);
+    font-family:"Trebuchet MS","Segoe UI",system-ui,-apple-system,sans-serif}
+  button{font-family:inherit;cursor:pointer;color:inherit}
+  .hidden{display:none !important}
+
+  #stage{position:fixed;inset:0;overflow:hidden;
+    background:radial-gradient(ellipse at 20% 10%,#1a2a6c 0%,transparent 55%),
+               radial-gradient(ellipse at 85% 90%,#3b1d7a 0%,transparent 50%),
+               linear-gradient(180deg,#050b1f,#0a1433 60%,#08102a)}
+  #cam{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);opacity:0;transition:opacity .5s;z-index:0}
+  #cam.on{opacity:1}
+  #dim{position:absolute;inset:0;z-index:1;pointer-events:none;
+    background:linear-gradient(180deg,rgba(5,11,31,.72) 0%,rgba(5,11,31,.38) 35%,rgba(5,11,31,.38) 70%,rgba(5,11,31,.75) 100%)}
+  #game{position:absolute;inset:0;width:100%;height:100%;z-index:2;cursor:crosshair;touch-action:none}
+  #flash{position:absolute;inset:0;z-index:3;pointer-events:none;opacity:0}
+  #flash.ok{animation:flashOk .8s ease-out forwards}
+  #flash.bad{animation:flashBad .8s ease-out forwards}
+  @keyframes flashOk{0%{opacity:.9;box-shadow:inset 0 0 120px 30px rgba(34,197,94,.55)}100%{opacity:0;box-shadow:inset 0 0 120px 30px rgba(34,197,94,.55)}}
+  @keyframes flashBad{0%{opacity:.9;box-shadow:inset 0 0 120px 30px rgba(239,68,68,.55)}100%{opacity:0;box-shadow:inset 0 0 120px 30px rgba(239,68,68,.55)}}
+  #stage.shake #game,#stage.shake #ui{animation:shake .4s ease-in-out}
+  @keyframes shake{0%,100%{transform:translate(0,0)}20%{transform:translate(-6px,2px)}40%{transform:translate(5px,-2px)}60%{transform:translate(-4px,1px)}80%{transform:translate(3px,-1px)}}
+
+  /* ===== UI ===== */
+  #ui{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;padding:12px 18px 10px;pointer-events:none;gap:10px}
+  #ui button{pointer-events:auto}
+  #hud{display:flex;align-items:stretch;justify-content:space-between;gap:12px}
+  .card{background:rgba(8,18,48,.82);border:1.5px solid rgba(34,211,238,.45);border-radius:16px;
+    padding:8px 16px;box-shadow:0 4px 20px rgba(0,0,0,.35),0 0 18px rgba(47,107,255,.2);backdrop-filter:blur(4px)}
+  .card .lbl{font-size:12px;letter-spacing:.14em;color:#9fb6ff;font-weight:700}
+  .card .val{font-size:clamp(22px,2.6vw,34px);font-weight:900;line-height:1.1}
+  #timerCard{min-width:170px;text-align:center}
+  #timerBar{height:8px;border-radius:6px;background:rgba(255,255,255,.15);overflow:hidden;margin-top:4px}
+  #timerFill{height:100%;width:100%;transform-origin:left center;background:linear-gradient(90deg,var(--cyan),var(--blue));transition:none}
+  #timerCard.low{border-color:var(--amber)}
+  #timerCard.low #timerFill{background:var(--amber)}
+  #timerCard.low .val{color:var(--amber);animation:pulse 1s infinite}
+  @keyframes pulse{50%{opacity:.6}}
+  #hearts{display:flex;gap:6px;align-items:center;font-size:clamp(26px,3vw,38px);line-height:1}
+  .heart{color:#ff4d6d;text-shadow:0 0 10px rgba(255,77,109,.7);transition:transform .3s}
+  .heart.lost{color:#64748b;text-shadow:none;transform:scale(.8)}
+  #qpanel{align-self:center;width:min(1150px,100%);text-align:center;padding:12px 24px;
+    background:linear-gradient(135deg,rgba(11,22,54,.9),rgba(40,22,90,.82));
+    border:2px solid rgba(139,92,246,.6);border-radius:20px;box-shadow:0 6px 28px rgba(0,0,0,.4),0 0 24px rgba(139,92,246,.25);
+    min-height:84px;display:flex;align-items:center;justify-content:center}
+  #qpanel.enter{animation:qin .45s ease-out}
+  @keyframes qin{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:none}}
+  #qtext{font-size:clamp(20px,2.6vw,34px);font-weight:800;line-height:1.25;text-shadow:0 2px 6px rgba(0,0,0,.6)}
+  #arena{flex:1;min-height:100px}
+  #fbWrap{min-height:58px;margin-bottom:34px;display:flex;align-items:flex-end;justify-content:center}
+  #fb{max-width:min(1100px,100%);padding:10px 20px;border-radius:16px;font-size:clamp(15px,1.7vw,21px);font-weight:700;text-align:center;line-height:1.3;
+    background:rgba(8,18,48,.92);border:2px solid var(--cyan);box-shadow:0 4px 20px rgba(0,0,0,.4)}
+  #fb.ok{border-color:#4ade80;background:rgba(6,60,30,.94)}
+  #fb.bad{border-color:#f87171;background:rgba(80,12,12,.94)}
+  #fb.pop{animation:qin .3s ease-out}
+  #bottom{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    background:rgba(5,11,31,.88);border:1.5px solid rgba(47,107,255,.5);border-radius:18px;padding:8px 14px;
+    box-shadow:0 -2px 20px rgba(47,107,255,.2)}
+  #gestureBox{display:flex;align-items:center;gap:12px;min-width:0}
+  .chip{display:flex;align-items:center;gap:9px;padding:7px 14px;border-radius:999px;font-weight:900;font-size:clamp(13px,1.3vw,17px);
+    background:rgba(47,107,255,.2);border:2px solid var(--blue);white-space:nowrap}
+  .chip .dot{width:13px;height:13px;border-radius:50%;background:var(--blue);box-shadow:0 0 10px currentColor}
+  .chip.ready{background:rgba(34,197,94,.22);border-color:var(--green);color:#bbf7d0}
+  .chip.ready .dot{background:var(--green)}
+  .chip.fired{background:rgba(139,92,246,.25);border-color:var(--purple);color:#ddd6fe}
+  .chip.fired .dot{background:var(--purple)}
+  .chip.warn{background:rgba(251,191,36,.18);border-color:var(--amber);color:#fde68a}
+  .chip.warn .dot{background:var(--amber)}
+  .chip.bad{background:rgba(239,68,68,.2);border-color:var(--red);color:#fecaca}
+  .chip.bad .dot{background:var(--red)}
+  #meterWrap{width:clamp(90px,10vw,150px);display:flex;flex-direction:column;gap:2px}
+  #meterWrap small{font-size:10px;letter-spacing:.1em;color:#9fb6ff;font-weight:700}
+  #meter{position:relative;height:10px;border-radius:6px;background:rgba(255,255,255,.15);overflow:hidden}
+  #meterFill{position:absolute;left:0;top:0;bottom:0;width:0;background:linear-gradient(90deg,var(--purple),var(--cyan))}
+  .mk{position:absolute;top:0;bottom:0;width:3px;background:#fff}
+  #mkFire{background:#f87171}#mkReady{background:#4ade80}
+  #hint{font-size:clamp(12px,1.15vw,15px);color:#cbd5ff;flex:1;text-align:center;min-width:180px}
+  #btns{display:flex;gap:8px;flex-wrap:wrap}
+  .btn{border:2px solid var(--cyan);background:rgba(34,211,238,.12);padding:9px 16px;border-radius:12px;font-weight:800;font-size:clamp(13px,1.2vw,16px);
+    transition:transform .15s,background .15s,box-shadow .15s}
+  .btn:hover{background:rgba(34,211,238,.28);transform:translateY(-1px);box-shadow:0 0 14px rgba(34,211,238,.45)}
+  .btn:focus-visible{outline:3px solid #fff;outline-offset:2px}
+  .btn.primary{background:linear-gradient(135deg,var(--blue),var(--purple));border-color:#a5b4fc;font-size:clamp(17px,1.7vw,22px);padding:14px 30px;
+    box-shadow:0 6px 24px rgba(79,70,229,.55);letter-spacing:.05em}
+  .btn.primary:hover{box-shadow:0 8px 30px rgba(99,102,241,.8)}
+  .btn.ghost{border-color:rgba(255,255,255,.4);background:rgba(255,255,255,.06)}
+  .btn.small{padding:6px 12px;font-size:13px}
+  .btn.on{background:rgba(34,197,94,.3);border-color:var(--green)}
+
+  /* ===== Screens ===== */
+  .screen{position:absolute;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;
+    background:radial-gradient(ellipse at center,rgba(10,20,55,.86),rgba(3,7,20,.95))}
+  #modalHow{z-index:12}
+  #screenLoading,#screenProblem{z-index:14}
+  .panel{position:relative;width:min(960px,100%);max-height:100%;overflow:auto;text-align:center;padding:clamp(18px,3vw,36px);
+    background:linear-gradient(160deg,rgba(14,28,70,.95),rgba(30,16,74,.95));border:2px solid rgba(34,211,238,.5);border-radius:26px;
+    box-shadow:0 10px 50px rgba(0,0,0,.6),0 0 40px rgba(47,107,255,.3)}
+  .panel.narrow{width:min(620px,100%)}
+  h1.title{font-size:clamp(34px,6vw,72px);font-weight:900;letter-spacing:.04em;line-height:1;
+    background:linear-gradient(90deg,#67e8f9,#818cf8,#c084fc);-webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 0 18px rgba(99,102,241,.6))}
+  .subtitle{margin-top:10px;font-size:clamp(15px,2vw,24px);font-weight:700;color:#bcd0ff;letter-spacing:.08em}
+  .menu-actions{display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:26px}
+  .menu-row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  .note{margin-top:14px;font-size:14px;color:#aab8e8;line-height:1.5}
+  /* decorative planets */
+  .deco{position:absolute;border-radius:50%;pointer-events:none}
+  .p1{width:120px;height:120px;left:-30px;top:-30px;background:radial-gradient(circle at 30% 30%,#fcd34d,#f97316 60%,#7c2d12);box-shadow:0 0 40px rgba(249,115,22,.6)}
+  .p2{width:70px;height:70px;right:30px;bottom:-24px;background:radial-gradient(circle at 30% 30%,#7dd3fc,#2563eb 60%,#1e1b4b);box-shadow:0 0 30px rgba(59,130,246,.6)}
+  .p3{width:46px;height:46px;right:-14px;top:40px;background:radial-gradient(circle at 30% 30%,#fca5a5,#dc2626 60%,#450a0a)}
+  .orbit{position:absolute;border:1.5px dashed rgba(129,140,248,.35);border-radius:50%;pointer-events:none;left:50%;top:50%;transform:translate(-50%,-50%)}
+  .o1{width:150%;height:130%}.o2{width:115%;height:100%}
+
+  h2.mh{font-size:clamp(22px,3vw,36px);font-weight:900;color:#67e8f9;letter-spacing:.05em;margin-bottom:14px}
+  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;text-align:center}
+  .step{background:rgba(5,11,31,.6);border:1.5px solid rgba(139,92,246,.5);border-radius:18px;padding:12px 10px}
+  .step svg{width:100%;max-width:130px;height:auto}
+  .step h3{font-size:15px;color:#fde68a;margin:4px 0 6px;letter-spacing:.04em}
+  .step p{font-size:13px;line-height:1.45;color:#e2e8ff;text-align:left}
+  .notes{margin-top:14px;text-align:left;font-size:14px;line-height:1.6;color:#d3dcff;background:rgba(5,11,31,.5);border-radius:14px;padding:12px 18px}
+  .notes li{margin-left:18px}
+  .modal-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+  @media(max-width:820px){.steps{grid-template-columns:repeat(2,1fr)}}
+
+  .spinner{width:56px;height:56px;border-radius:50%;border:6px solid rgba(255,255,255,.15);border-top-color:var(--cyan);margin:0 auto 18px;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .big{font-size:clamp(18px,2.2vw,26px);font-weight:800}
+  .msg{margin:12px 0;font-size:clamp(15px,1.6vw,19px);line-height:1.55;color:#dbe5ff}
+
+  .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:18px 0}
+  .stat{background:rgba(5,11,31,.6);border:1.5px solid rgba(34,211,238,.4);border-radius:16px;padding:12px}
+  .stat b{display:block;font-size:clamp(26px,3.4vw,42px);font-weight:900}
+  .stat span{font-size:13px;color:#9fb6ff;font-weight:700;letter-spacing:.06em}
+  .stat.score{grid-column:1/-1;border-color:var(--amber)}
+  .stat.score b{color:var(--amber)}
+
+  #calib{position:absolute;z-index:6;left:50%;top:38%;transform:translateX(-50%);width:min(640px,92%);text-align:center;padding:18px 24px;
+    background:rgba(8,18,48,.92);border:2px solid var(--cyan);border-radius:22px;box-shadow:0 0 30px rgba(34,211,238,.4);pointer-events:none}
+  #calib button{pointer-events:auto;margin-top:10px}
+  #calib .cnt{font-size:44px;font-weight:900;color:var(--cyan)}
+  #toast{position:absolute;z-index:30;left:50%;top:90px;transform:translateX(-50%);max-width:min(720px,92%);padding:10px 20px;border-radius:14px;
+    background:rgba(8,18,48,.96);border:2px solid var(--amber);font-weight:700;text-align:center;pointer-events:none;opacity:0;transition:opacity .3s}
+  #toast.show{opacity:1}
+  @media (prefers-reduced-motion:reduce){
+    #stage.shake #game,#stage.shake #ui{animation:none}
+    #timerCard.low .val{animation:none}
+  }
+  @media (max-height:640px){
+    #ui{gap:6px;padding:8px 12px 6px}
+    #qpanel{min-height:60px;padding:8px 16px}
+    #fbWrap{min-height:44px;margin-bottom:28px}
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <video id="cam" autoplay playsinline muted></video>
+  <div id="dim"></div>
+  <canvas id="game"></canvas>
+  <div id="flash"></div>
+
+  <!-- ===== Antarmuka permainan ===== -->
+  <div id="ui" class="hidden">
+    <div id="hud">
+      <div class="card"><div class="lbl">SKOR</div><div class="val" id="hudScore">0</div></div>
+      <div class="card"><div class="lbl">SOAL</div><div class="val" id="hudQ">1/20</div></div>
+      <div class="card" id="timerCard">
+        <div class="lbl">WAKTU</div>
+        <div class="val"><span id="hudTime">30</span> dtk</div>
+        <div id="timerBar"><div id="timerFill"></div></div>
+      </div>
+      <div class="card"><div class="lbl">NYAWA</div><div id="hearts" aria-label="Nyawa"></div></div>
+    </div>
+    <div id="qpanel"><div id="qtext">Bersiap...</div></div>
+    <div id="arena"></div>
+    <div id="fbWrap"><div id="fb" class="hidden" role="status" aria-live="polite"></div></div>
+    <div id="bottom">
+      <div id="gestureBox">
+        <div class="chip idle" id="gChip" role="status" aria-live="polite"><span class="dot"></span><span id="gText">MODE MOUSE</span></div>
+        <div id="meterWrap" class="hidden">
+          <small>IBU JARI</small>
+          <div id="meter"><div id="meterFill"></div><div class="mk" id="mkReady"></div><div class="mk" id="mkFire"></div></div>
+        </div>
+      </div>
+      <div id="hint">Telunjuk = bidik &nbsp;•&nbsp; Turunkan ibu jari = tembak &nbsp;•&nbsp; Mouse: klik kiri &nbsp;•&nbsp; Spasi/panah juga bisa</div>
+      <div id="btns">
+        <button class="btn" id="btnPause" type="button">⏸ Jeda</button>
+        <button class="btn" id="btnMouse" type="button">🖱 Gunakan Mouse</button>
+        <button class="btn" id="btnSound" type="button" aria-pressed="true">🔊 Suara</button>
+        <button class="btn" id="btnFull" type="button">⛶ Layar Penuh</button>
+        <button class="btn ghost" id="btnExit" type="button">Keluar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="calib" class="hidden">
+    <div class="big">KALIBRASI SINGKAT</div>
+    <p class="msg">1. Arahkan telunjuk ke depan.<br>2. Angkat ibu jari dan tahan.</p>
+    <div class="cnt" id="calibCnt">2</div>
+    <button class="btn small" id="btnCalibSkip" type="button">Lewati</button>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <!-- ===== Menu ===== -->
+  <section id="screenMenu" class="screen">
+    <div class="panel" style="padding-top:clamp(34px,5vw,60px);padding-bottom:clamp(30px,4vw,50px)">
+      <div class="orbit o1"></div><div class="orbit o2"></div>
+      <div class="deco p1"></div><div class="deco p2"></div><div class="deco p3"></div>
+      <div style="position:relative">
+        <h1 class="title">SPACE SHOOTER</h1>
+        <div class="subtitle">PETUALANGAN TATA SURYA</div>
+        <p class="msg" style="margin-top:14px">Tembak jawaban yang benar dengan telunjuk dan ibu jarimu!<br>IPAS Kelas 6 • 20 soal • 3 nyawa</p>
+        <div class="menu-actions">
+          <button class="btn primary" id="btnStart" type="button">🚀 MULAI GAME</button>
+          <div class="menu-row">
+            <button class="btn" id="btnMenuMouse" type="button">🖱 Gunakan Mouse</button>
+            <button class="btn ghost" id="btnMenuHow" type="button">Cara Bermain</button>
+          </div>
+        </div>
+        <p class="note">Kamera baru dinyalakan setelah kamu menekan MULAI GAME.<br>Tanpa webcam? Pilih “Gunakan Mouse” — game tetap bisa dimainkan.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Modal panduan ===== -->
+  <section id="modalHow" class="screen hidden" role="dialog" aria-modal="true" aria-labelledby="howTitle">
+    <div class="panel">
+      <h2 class="mh" id="howTitle">CARA BERMAIN SPACE SHOOTER</h2>
+      <div class="steps">
+        <div class="step"><div id="ill1"></div><h3>LANGKAH 1 — BIDIK</h3><p>Angkat tangan di depan webcam. Luruskan jari telunjuk ke arah layar. Gerakkan tangan untuk mengarahkan crosshair ke target jawaban.</p></div>
+        <div class="step"><div id="ill2"></div><h3>LANGKAH 2 — SIAP</h3><p>Biarkan ibu jari terangkat atau rileks ke atas. Indikator akan berubah menjadi hijau dengan teks READY.</p></div>
+        <div class="step"><div id="ill3"></div><h3>LANGKAH 3 — TEMBAK</h3><p>Turunkan ibu jari dengan gerakan yang jelas. Sistem akan menembakkan peluru ke arah crosshair.</p></div>
+        <div class="step"><div id="ill4"></div><h3>LANGKAH 4 — ISI ULANG</h3><p>Angkat kembali ibu jari hingga indikator READY aktif. Setelah itu, kamu dapat menembak lagi.</p></div>
+      </div>
+      <ul class="notes">
+        <li>Tidak perlu mencubit jari dan tidak perlu menahan crosshair di target.</li>
+        <li>Tidak ada tembak otomatis: tembakan hanya muncul saat ibu jari turun atau saat klik mouse.</li>
+        <li>Pastikan tangan terlihat penuh di dalam area webcam.</li>
+        <li>Jika kontrol gestur tidak bekerja, gunakan mouse: gerakkan untuk membidik, klik kiri untuk menembak.</li>
+      </ul>
+      <div class="modal-actions">
+        <button class="btn primary" id="howStart" type="button">🚀 MULAI GAME</button>
+        <button class="btn" id="howMouse" type="button">🖱 Main dengan Mouse saja</button>
+        <button class="btn" id="howClose" type="button">Tutup</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Memuat ===== -->
+  <section id="screenLoading" class="screen hidden">
+    <div class="panel narrow">
+      <div class="spinner"></div>
+      <div class="big" id="loadText">Menyiapkan...</div>
+      <p class="msg">Jika browser meminta izin kamera, pilih <b>Izinkan</b>.</p>
+      <button class="btn" id="btnLoadCancel" type="button">Batal, main dengan mouse</button>
+    </div>
+  </section>
+
+  <!-- ===== Masalah kamera/gestur ===== -->
+  <section id="screenProblem" class="screen hidden" role="alertdialog" aria-labelledby="probTitle">
+    <div class="panel narrow">
+      <div class="big" id="probTitle" style="color:#fde68a">Ups, ada kendala</div>
+      <p class="msg" id="probMsg"></p>
+      <div class="modal-actions">
+        <button class="btn primary" id="probRetry" type="button" style="font-size:18px;padding:12px 24px">🔄 Coba Lagi</button>
+        <button class="btn" id="probMouse" type="button">🖱 Main dengan Mouse</button>
+        <button class="btn ghost" id="probMenu" type="button">Kembali ke Menu</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Jeda ===== -->
+  <section id="screenPause" class="screen hidden">
+    <div class="panel narrow">
+      <h2 class="mh">GAME DIJEDA</h2>
+      <p class="msg">Waktu dan tembakan dihentikan sementara.</p>
+      <div class="modal-actions" style="flex-direction:column;align-items:center">
+        <button class="btn primary" id="btnResume" type="button">▶ LANJUTKAN</button>
+        <button class="btn small" id="btnPauseHow" type="button">Cara Bermain Lagi</button>
+        <button class="btn ghost" id="btnPauseExit" type="button">Keluar ke Menu</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Hasil ===== -->
+  <section id="screenResult" class="screen hidden">
+    <div class="panel narrow">
+      <h2 class="mh" style="font-size:clamp(28px,4vw,48px)">MISI SELESAI</h2>
+      <div class="stats">
+        <div class="stat score"><b id="rScore">0</b><span>SKOR AKHIR dari maksimal 2.000</span></div>
+        <div class="stat"><b id="rCorrect">0</b><span>JAWABAN BENAR</span></div>
+        <div class="stat"><b id="rWrong">0</b><span>JAWABAN SALAH</span></div>
+        <div class="stat"><b id="rUn">0</b><span>TIDAK TERJAWAB</span></div>
+        <div class="stat"><b id="rPct">0%</b><span>PERSENTASE BENAR</span></div>
+      </div>
+      <p class="msg" id="rMsg"></p>
+      <div class="modal-actions">
+        <button class="btn primary" id="btnAgain" type="button">🔁 MAIN LAGI</button>
+        <button class="btn ghost" id="btnToMenu" type="button">KEMBALI KE MENU</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+'use strict';
+(function () {
+
+  /* =====================  KONSTANTA  ===================== */
+  var TOTAL_Q = 20;
+  var Q_TIME = 30000;
+  var FEEDBACK_MS = 1500;
+  var START_LIVES = 3;
+  var POINTS = 100;
+  var CALIB_MS = 2000;
+  var LERP = 0.3;
+  var DEAD_ZONE = 4;
+  var MP_VERSION = '0.4.1646424915';
+  var MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@' + MP_VERSION + '/';
+  var LETTERS = ['A', 'B', 'C', 'D'];
+
+  /* =====================  20 SOAL  ===================== */
+  var QUESTIONS = [
+    { question: "Apa yang dimaksud dengan tata surya?", options: ["Matahari beserta benda-benda langit yang mengorbit di sekitarnya", "Kumpulan semua bintang yang ada di langit", "Hanya delapan planet yang berjajar", "Bumi dan Bulan saja"], answer: 0, explanation: "Tata surya terdiri atas Matahari dan benda langit yang mengelilinginya, seperti planet, satelit, asteroid, dan komet." },
+    { question: "Apa yang menjadi pusat tata surya kita?", options: ["Matahari", "Bumi", "Bulan", "Jupiter"], answer: 0, explanation: "Matahari adalah pusat tata surya. Semua planet mengelilingi Matahari." },
+    { question: "Apa perbedaan planet dan bintang yang benar?", options: ["Bintang memancarkan cahaya sendiri, planet memantulkan cahaya bintang", "Planet memancarkan cahaya sendiri, bintang tidak", "Keduanya memancarkan cahaya sendiri", "Keduanya tidak bercahaya sama sekali"], answer: 0, explanation: "Matahari adalah bintang sehingga bercahaya sendiri. Planet hanya memantulkan cahaya Matahari." },
+    { question: "Berapa jumlah planet di tata surya kita?", options: ["8", "7", "9", "10"], answer: 0, explanation: "Ada delapan planet: Merkurius, Venus, Bumi, Mars, Jupiter, Saturnus, Uranus, dan Neptunus." },
+    { question: "Manakah urutan planet yang benar dari yang terdekat dengan Matahari?", options: ["Merkurius, Venus, Bumi, Mars", "Venus, Merkurius, Bumi, Mars", "Merkurius, Bumi, Venus, Mars", "Bumi, Venus, Merkurius, Mars"], answer: 0, explanation: "Urutannya: Merkurius, Venus, Bumi, Mars, Jupiter, Saturnus, Uranus, Neptunus." },
+    { question: "Planet yang paling dekat dengan Matahari adalah ...", options: ["Merkurius", "Venus", "Mars", "Neptunus"], answer: 0, explanation: "Merkurius adalah planet terdekat dari Matahari dan juga planet terkecil." },
+    { question: "Planet yang paling jauh dari Matahari adalah ...", options: ["Neptunus", "Uranus", "Saturnus", "Jupiter"], answer: 0, explanation: "Neptunus adalah planet kedelapan, yaitu yang paling jauh dari Matahari." },
+    { question: "Manakah kelompok yang semuanya termasuk planet dalam?", options: ["Merkurius, Venus, Bumi, Mars", "Jupiter, Saturnus, Uranus, Neptunus", "Bumi, Jupiter, Saturnus, Neptunus", "Venus, Mars, Uranus, Saturnus"], answer: 0, explanation: "Planet dalam berada di antara Matahari dan sabuk asteroid: Merkurius, Venus, Bumi, dan Mars." },
+    { question: "Manakah yang termasuk planet luar?", options: ["Saturnus", "Venus", "Merkurius", "Mars"], answer: 0, explanation: "Planet luar berada setelah sabuk asteroid: Jupiter, Saturnus, Uranus, dan Neptunus." },
+    { question: "Planet terbesar di tata surya adalah ...", options: ["Jupiter", "Saturnus", "Bumi", "Neptunus"], answer: 0, explanation: "Jupiter adalah planet terbesar. Ukurannya cukup untuk memuat lebih dari seribu Bumi." },
+    { question: "Perputaran Bumi pada porosnya disebut ...", options: ["Rotasi", "Revolusi", "Gravitasi", "Fase"], answer: 0, explanation: "Rotasi adalah perputaran benda pada porosnya. Satu kali rotasi Bumi sekitar 24 jam." },
+    { question: "Saat siang hari di Indonesia, sebagian tempat lain di Bumi sedang malam. Penyebabnya adalah ...", options: ["Bumi berotasi sehingga hanya setengah bagiannya terkena sinar Matahari", "Matahari berpindah mengelilingi Bumi", "Bulan menutupi Matahari setiap hari", "Bumi berhenti bergerak"], answer: 0, explanation: "Karena Bumi berotasi, bagian yang menghadap Matahari mengalami siang, sedangkan bagian lainnya malam." },
+    { question: "Bumi mengelilingi Matahari satu kali penuh. Waktu yang berlalu adalah sekitar ...", options: ["1 tahun (sekitar 365 hari)", "1 hari (24 jam)", "1 bulan", "1 minggu"], answer: 0, explanation: "Satu kali revolusi Bumi memerlukan waktu sekitar 365 hari, yaitu satu tahun." },
+    { question: "Bulan adalah ... bagi Bumi.", options: ["satelit alami", "bintang", "planet", "komet"], answer: 0, explanation: "Bulan mengorbit Bumi sehingga disebut satelit alami Bumi." },
+    { question: "Saat Bulan purnama, Bulan tampak dari Bumi ...", options: ["bulat penuh dan terang", "berbentuk sabit tipis", "tidak terlihat sama sekali", "hanya separuh gelap"], answer: 0, explanation: "Pada fase purnama, seluruh sisi Bulan yang menghadap Bumi terkena cahaya Matahari." },
+    { question: "Gerhana Matahari terjadi ketika ...", options: ["Bulan berada di antara Matahari dan Bumi", "Bumi berada di antara Matahari dan Bulan", "Matahari berada di antara Bumi dan Bulan", "Planet Mars melintas di depan Bumi"], answer: 0, explanation: "Saat Bulan berada tepat di antara Matahari dan Bumi, bayangan Bulan menutupi cahaya Matahari." },
+    { question: "Gerhana Bulan terjadi ketika ...", options: ["Bumi berada di antara Matahari dan Bulan", "Bulan berada di antara Matahari dan Bumi", "Bulan menjauh dari Bumi", "Awan menutupi Bulan"], answer: 0, explanation: "Bayangan Bumi menutupi Bulan sehingga Bulan tampak gelap atau kemerahan." },
+    { question: "Benda berbatu kecil yang banyak mengorbit Matahari di antara Mars dan Jupiter disebut ...", options: ["Asteroid", "Bintang", "Bulan", "Matahari"], answer: 0, explanation: "Daerah tempat banyak asteroid berkumpul disebut sabuk asteroid." },
+    { question: "Benda langit dari es dan debu yang memiliki ekor saat mendekati Matahari disebut ...", options: ["Komet", "Asteroid", "Planet", "Bulan"], answer: 0, explanation: "Saat dekat Matahari, es pada komet menguap dan membentuk ekor yang panjang." },
+    { question: "Apa yang membuat planet-planet tetap mengorbit Matahari?", options: ["Gaya gravitasi Matahari", "Angin yang kencang", "Cahaya Bulan", "Hujan meteor"], answer: 0, explanation: "Gravitasi Matahari menarik planet sehingga planet bergerak mengelilinginya dan tidak lepas ke ruang angkasa." }
+  ];
+
+  function validateQuestions() {
+    var ok = QUESTIONS.length === TOTAL_Q;
+    QUESTIONS.forEach(function (q) {
+      var uniq = {};
+      q.options.forEach(function (o) { uniq[o] = true; });
+      if (q.options.length !== 4 || Object.keys(uniq).length !== 4 || q.answer < 0 || q.answer > 3) { ok = false; }
+    });
+    if (!ok) { console.warn('Data soal tidak valid'); }
+    return ok;
+  }
+
+  /* =====================  ELEMEN DOM  ===================== */
+  function $(id) { return document.getElementById(id); }
+  var stage = $('stage'), video = $('cam'), canvas = $('game'), ctx = canvas.getContext('2d');
+  var flashEl = $('flash'), ui = $('ui'), arena = $('arena'), bottomEl = $('bottom');
+  var qpanel = $('qpanel'), qtext = $('qtext'), fbEl = $('fb');
+  var hudScore = $('hudScore'), hudQ = $('hudQ'), hudTime = $('hudTime'), timerCard = $('timerCard'), timerFill = $('timerFill');
+  var heartsEl = $('hearts'), gChip = $('gChip'), gText = $('gText');
+  var meterWrap = $('meterWrap'), meterFill = $('meterFill'), mkReady = $('mkReady'), mkFire = $('mkFire');
+  var screenMenu = $('screenMenu'), modalHow = $('modalHow'), screenLoading = $('screenLoading'), screenProblem = $('screenProblem');
+  var screenPause = $('screenPause'), screenResult = $('screenResult'), calibEl = $('calib'), toastEl = $('toast');
+  var btnMouse = $('btnMouse'), btnSound = $('btnSound'), btnFull = $('btnFull'), btnPause = $('btnPause');
+
+  function show(el) { el.classList.remove('hidden'); }
+  function hide(el) { el.classList.add('hidden'); }
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+
+  /* =====================  STATE  ===================== */
+  var state = 'menu';            // menu, calibrating, playing, feedback, paused, gameover
+  var pausedFrom = null;
+  var initialized = false;
+  var rafId = 0;
+  var lastFrameTs = 0;
+  var W = 0, H = 0, dpr = 1;
+
+  var session = [];
+  var qIndex = -1;
+  var score = 0, lives = START_LIVES, correctCount = 0, wrongCount = 0, timeoutCount = 0;
+  var answerLocked = false;
+  var deadline = 0, remainingMs = Q_TIME, feedbackUntil = 0, pauseRemaining = 0, calibEnd = 0, qStartAt = 0;
+  var lastShotAt = 0, muzzleAt = -9999;
+  var targets = [];
+  var particles = [], lasers = [], floats = [];
+  var stars = [];
+  var turret = { x: 0, y: 0 };
+  var toastTimer = 0;
+  var sessionToken = 0;
+  var howMode = 'info';
+  var soundOn = true;
+  var hudCache = { score: -1, q: '', time: -1, lives: -1 };
+
+  /* pointer */
+  var ptr = { x: 0, y: 0, tx: 0, ty: 0 };
+  var ptrHistory = [];
+  var lastMouseMove = -99999;
+  var hoverIdx = -1;
+
+  /* kamera + mediapipe */
+  var stream = null, cameraPromise = null;
+  var hands = null, handsReady = false, mpPromise = null, mpScriptPromise = null;
+  var gestureActive = false, gestureTimer = 0, processing = false, lastSend = 0, sendErrors = 0;
+  var forceMouse = false;
+  var handVisible = false, lastHandSeen = 0;
+  var procCanvas = document.createElement('canvas'), procCtx = procCanvas.getContext('2d');
+  var procAspect = 4 / 3;
+  var calibrated = false, calibSamples = [];
+  var DEFAULT_READY = 0.62, DEFAULT_FIRE = 0.42;
+  var readyThresh = DEFAULT_READY, fireThresh = DEFAULT_FIRE;
+  var gesture = { armed: false, locked: false, stableUp: 0, state: 'NOTREADY', metric: 0, lastFire: 0, pointing: false };
+  var statusKey = '';
+  var meterVal = -1;
+
+  /* =====================  AUDIO (Web Audio API)  ===================== */
+  var audioCtx = null, masterGain = null;
+  function ensureAudio() {
+    if (!audioCtx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) { return null; }
+      try {
+        audioCtx = new AC();
+        masterGain = audioCtx.createGain();
+        masterGain.gain.value = 0.4;
+        masterGain.connect(audioCtx.destination);
+      } catch (e) { audioCtx = null; return null; }
+    }
+    if (audioCtx.state === 'suspended') { audioCtx.resume().catch(function () {}); }
+    return audioCtx;
+  }
+  function tone(freq, dur, type, vol, slideTo, delay) {
+    if (!soundOn || !audioCtx || !masterGain) { return; }
+    try {
+      var t0 = audioCtx.currentTime + (delay || 0);
+      var osc = audioCtx.createOscillator();
+      var g = audioCtx.createGain();
+      osc.type = type || 'sine';
+      osc.frequency.setValueAtTime(freq, t0);
+      if (slideTo) { osc.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur); }
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(vol, t0 + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      osc.connect(g); g.connect(masterGain);
+      osc.start(t0); osc.stop(t0 + dur + 0.03);
+    } catch (e) { /* audio tidak kritis */ }
+  }
+  var noiseBuf = null;
+  function getNoiseBuffer() {
+    if (noiseBuf || !audioCtx) { return noiseBuf; }
+    var len = Math.floor(audioCtx.sampleRate * 0.6);
+    noiseBuf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+    var d = noiseBuf.getChannelData(0);
+    for (var i = 0; i < len; i++) { d[i] = Math.random() * 2 - 1; }
+    return noiseBuf;
+  }
+  function noiseBurst(dur, vol, filterType, f0, f1, delay) {
+    if (!soundOn || !audioCtx || !masterGain) { return; }
+    var buf = getNoiseBuffer();
+    if (!buf) { return; }
+    try {
+      var t0 = audioCtx.currentTime + (delay || 0);
+      var src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      var flt = audioCtx.createBiquadFilter();
+      flt.type = filterType;
+      flt.frequency.setValueAtTime(f0, t0);
+      flt.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+      var g = audioCtx.createGain();
+      g.gain.setValueAtTime(vol, t0);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      src.connect(flt); flt.connect(g); g.connect(masterGain);
+      src.start(t0, Math.random() * 0.2); src.stop(t0 + dur + 0.03);
+    } catch (e) { /* audio tidak kritis */ }
+  }
+  /* Suara tembakan pistol / petasan: letupan noise tajam + dentuman bass + gema singkat */
+  function playShootSound() {
+    noiseBurst(0.07, 0.9, 'highpass', 1200, 3000, 0);      /* letupan "dor" tajam */
+    noiseBurst(0.22, 0.7, 'lowpass', 5000, 300, 0);        /* badan ledakan */
+    tone(160, 0.14, 'sine', 0.5, 45, 0);                    /* dentuman bass */
+    noiseBurst(0.16, 0.18, 'lowpass', 2500, 250, 0.09);    /* gema pendek */
+  }
+  function playCorrectSound() { tone(523, 0.16, 'sine', 0.18, 0, 0); tone(659, 0.16, 'sine', 0.18, 0, 0.1); tone(784, 0.28, 'sine', 0.2, 0, 0.2); }
+  function playWrongSound() { tone(240, 0.32, 'square', 0.12, 110, 0); }
+  function playTimeoutSound() { tone(330, 0.18, 'triangle', 0.2, 0, 0); tone(330, 0.18, 'triangle', 0.2, 0, 0.25); tone(220, 0.3, 'triangle', 0.2, 0, 0.5); }
+  function playGameOverSound() { tone(523, 0.22, 'triangle', 0.18, 0, 0); tone(440, 0.22, 'triangle', 0.18, 0, 0.22); tone(349, 0.22, 'triangle', 0.18, 0, 0.44); tone(262, 0.5, 'triangle', 0.2, 0, 0.66); }
+
+  /* =====================  UTILITAS UI  ===================== */
+  function toast(msg, ms) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, ms || 3500);
+  }
+  function triggerFlash(kind) {
+    flashEl.className = '';
+    void flashEl.offsetWidth;
+    flashEl.className = kind;
+  }
+  function triggerShake() {
+    stage.classList.remove('shake');
+    void stage.offsetWidth;
+    stage.classList.add('shake');
+  }
+  function shuffle(arr) {
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+  function handSvg(thumbUp, extra) {
+    var thumb = thumbUp
+      ? '<rect x="20" y="40" width="13" height="40" rx="6.5" transform="rotate(-18 28 80)" fill="#f8d2ac" stroke="#b9783f" stroke-width="2"/>'
+      : '<rect x="34" y="66" width="38" height="13" rx="6.5" fill="#f8d2ac" stroke="#b9783f" stroke-width="2"/>';
+    return '<svg viewBox="0 0 130 130" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+      '<circle cx="65" cy="65" r="60" fill="rgba(47,107,255,.15)" stroke="rgba(34,211,238,.4)" stroke-dasharray="4 5"/>' +
+      '<rect x="40" y="60" width="46" height="52" rx="18" fill="#f8d2ac" stroke="#b9783f" stroke-width="2"/>' +
+      '<rect x="40" y="52" width="12" height="26" rx="6" fill="#f3c59a" stroke="#b9783f" stroke-width="2"/>' +
+      '<rect x="51" y="50" width="12" height="28" rx="6" fill="#f3c59a" stroke="#b9783f" stroke-width="2"/>' +
+      '<rect x="62" y="52" width="11" height="26" rx="5.5" fill="#f3c59a" stroke="#b9783f" stroke-width="2"/>' +
+      '<rect x="74" y="14" width="13" height="56" rx="6.5" fill="#f8d2ac" stroke="#b9783f" stroke-width="2"/>' +
+      thumb + (extra || '') + '</svg>';
+  }
+  function buildIllustrations() {
+    $('ill1').innerHTML = handSvg(true, '<g stroke="#22d3ee" stroke-width="3" fill="none"><circle cx="80" cy="10" r="8"/><line x1="80" y1="-2" x2="80" y2="22"/><line x1="68" y1="10" x2="92" y2="10"/></g>');
+    $('ill2').innerHTML = handSvg(true, '<rect x="8" y="104" width="76" height="20" rx="10" fill="#16a34a" stroke="#bbf7d0" stroke-width="2"/><text x="46" y="119" text-anchor="middle" font-size="13" font-weight="900" fill="#fff" font-family="Trebuchet MS,sans-serif">READY</text>');
+    $('ill3').innerHTML = handSvg(false, '<path d="M20 30 L20 62" stroke="#f87171" stroke-width="5" stroke-linecap="round"/><path d="M12 54 L20 64 L28 54" stroke="#f87171" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><g stroke="#fde047" stroke-width="3" stroke-linecap="round"><line x1="96" y1="8" x2="118" y2="0"/><line x1="98" y1="22" x2="124" y2="22"/><line x1="96" y1="36" x2="118" y2="46"/></g>');
+    $('ill4').innerHTML = handSvg(true, '<path d="M12 28 A22 22 0 0 1 40 10" stroke="#4ade80" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M34 2 L42 10 L32 16" stroke="#4ade80" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>');
+  }
+
+  /* =====================  CANVAS & LAYOUT  ===================== */
+  function resizeCanvas() {
+    var r = stage.getBoundingClientRect();
+    W = Math.max(1, Math.round(r.width));
+    H = Math.max(1, Math.round(r.height));
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    if (!ptr.x && !ptr.y) { ptr.x = ptr.tx = W / 2; ptr.y = ptr.ty = H / 2; }
+    ptr.x = clamp(ptr.x, 0, W); ptr.y = clamp(ptr.y, 0, H);
+    ptr.tx = clamp(ptr.tx, 0, W); ptr.ty = clamp(ptr.ty, 0, H);
+    if (!stars.length) {
+      for (var i = 0; i < 70; i++) { stars.push({ x: Math.random(), y: Math.random(), r: Math.random() * 1.4 + 0.4, p: Math.random() * 6.28 }); }
+    }
+    layoutTargets();
+  }
+
+  function wrapLines(text, maxW) {
+    var words = text.split(' '), lines = [], cur = '';
+    for (var i = 0; i < words.length; i++) {
+      var test = cur ? cur + ' ' + words[i] : words[i];
+      if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = words[i]; } else { cur = test; }
+    }
+    if (cur) { lines.push(cur); }
+    return lines;
+  }
+
+  function layoutTargets() {
+    if (!W || ui.classList.contains('hidden')) { return; }
+    var sr = stage.getBoundingClientRect();
+    var ar = arena.getBoundingClientRect();
+    var br = bottomEl.getBoundingClientRect();
+    if (ar.width < 10 || ar.height < 10) { return; }
+    turret.x = W / 2;
+    turret.y = br.top - sr.top + 12;
+    var gap = clamp(W * 0.022, 16, 36);
+    var cw = Math.max(130, Math.min((ar.width - gap) / 2, 620));
+    var ch = Math.max(58, Math.min((ar.height - gap) / 2, 200));
+    var gw = cw * 2 + gap, gh = ch * 2 + gap;
+    var gx = ar.left - sr.left + (ar.width - gw) / 2;
+    var gy = ar.top - sr.top + (ar.height - gh) / 2;
+    for (var i = 0; i < targets.length; i++) {
+      var t = targets[i];
+      t.x = gx + (i % 2) * (cw + gap);
+      t.y = gy + Math.floor(i / 2) * (ch + gap);
+      t.w = cw; t.h = ch;
+      t.badge = Math.min(ch * 0.62, 86);
+      t.pad = ch * 0.14;
+      t.textX = t.pad * 2 + t.badge;
+      t.textW = cw - t.textX - t.pad - ch * 0.34;
+      var maxFs = Math.min(30, ch * 0.27), fs;
+      for (fs = maxFs; fs >= 12; fs -= 1) {
+        ctx.font = '800 ' + fs + 'px "Trebuchet MS","Segoe UI",sans-serif';
+        var lines = wrapLines(t.text, t.textW);
+        if (lines.length * fs * 1.22 <= ch * 0.82) { break; }
+      }
+      t.fs = fs;
+      ctx.font = '800 ' + fs + 'px "Trebuchet MS","Segoe UI",sans-serif';
+      t.lines = wrapLines(t.text, t.textW);
+    }
+  }
+
+  function getTargetRect(i, now) {
+    var t = targets[i];
+    var bob = Math.sin(now / 650 + i * 1.7) * 3;
+    return { x: t.x, y: t.y + bob, w: t.w, h: t.h };
+  }
+
+  /* =====================  GAMBAR  ===================== */
+  function rrPath(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawBackdrop(now) {
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+      ctx.globalAlpha = 0.25 + 0.35 * (0.5 + 0.5 * Math.sin(now / 900 + s.p));
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.r, 0, 6.283); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = 'rgba(129,140,248,.16)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(W * 0.5, H * 1.15, W * 0.62, H * 0.62, 0, Math.PI, 2 * Math.PI); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(W * 0.5, H * 1.15, W * 0.42, H * 0.46, 0, Math.PI, 2 * Math.PI); ctx.stroke();
+    var a1 = Math.PI + ((now / 24000) % 1) * Math.PI;
+    var a2 = Math.PI + ((now / 15000 + 0.4) % 1) * Math.PI;
+    ctx.fillStyle = 'rgba(103,232,249,.7)';
+    ctx.beginPath(); ctx.arc(W * 0.5 + Math.cos(a1) * W * 0.62, H * 1.15 + Math.sin(a1) * H * 0.62, 6, 0, 6.283); ctx.fill();
+    ctx.fillStyle = 'rgba(192,132,252,.75)';
+    ctx.beginPath(); ctx.arc(W * 0.5 + Math.cos(a2) * W * 0.42, H * 1.15 + Math.sin(a2) * H * 0.46, 5, 0, 6.283); ctx.fill();
+  }
+
+  function drawTarget(t, i, now) {
+    var r = getTargetRect(i, now);
+    var sc = 1, al = 1, ox = 0;
+    var intro = clamp((now - qStartAt - i * 60) / 350, 0, 1);
+    var e = 1 - Math.pow(1 - intro, 3);
+    sc *= 0.85 + 0.15 * e; al *= e;
+    var age = now - (t.hitAt || 0);
+    if (t.state === 'correct') { sc *= 1 + 0.08 * Math.sin(clamp(age / 300, 0, 1) * Math.PI); }
+    if (t.state === 'wrong') { ox = Math.sin(age / 35) * Math.max(0, 1 - age / 400) * 8; }
+    if (answerLocked && t.state === 'idle') { al *= 0.45; }
+
+    var fill = 'rgba(10,26,66,.86)', border = '#22d3ee', glow = 'rgba(34,211,238,.35)', mark = '', badgeCol = '#8b5cf6';
+    if (t.state === 'idle' && t.hover) { fill = 'rgba(24,52,120,.92)'; border = '#ffffff'; glow = 'rgba(255,255,255,.75)'; }
+    if (t.state === 'correct') { fill = 'rgba(21,128,61,.92)'; border = '#4ade80'; glow = 'rgba(74,222,128,.7)'; mark = '✓'; badgeCol = '#16a34a'; }
+    if (t.state === 'wrong') { fill = 'rgba(153,27,27,.92)'; border = '#f87171'; glow = 'rgba(248,113,113,.7)'; mark = '✗'; badgeCol = '#dc2626'; }
+    if (t.state === 'reveal') { fill = 'rgba(21,128,61,.6)'; border = '#4ade80'; glow = 'rgba(74,222,128,.5)'; mark = '✓'; badgeCol = '#16a34a'; }
+
+    ctx.save();
+    ctx.globalAlpha = al;
+    ctx.translate(r.x + r.w / 2 + ox, r.y + r.h / 2);
+    ctx.scale(sc, sc);
+    ctx.translate(-r.w / 2, -r.h / 2);
+
+    ctx.shadowColor = glow; ctx.shadowBlur = (t.hover && t.state === 'idle') ? 34 : 16;
+    rrPath(0, 0, r.w, r.h, r.h / 2.4);
+    var grad = ctx.createLinearGradient(0, 0, r.w, r.h);
+    grad.addColorStop(0, fill); grad.addColorStop(1, 'rgba(32,18,80,.9)');
+    ctx.fillStyle = (t.state === 'idle') ? grad : fill;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = (t.hover && t.state === 'idle') ? 5 : 3.5;
+    ctx.strokeStyle = border;
+    if (t.state === 'reveal') { ctx.setLineDash([10, 7]); }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    /* papan sasaran: huruf pilihan */
+    var cx = t.pad + t.badge / 2, cy = r.h / 2, br = t.badge / 2;
+    ctx.beginPath(); ctx.arc(cx, cy, br, 0, 6.283);
+    var bg = ctx.createRadialGradient(cx - br * 0.3, cy - br * 0.3, 2, cx, cy, br);
+    bg.addColorStop(0, '#c4b5fd'); bg.addColorStop(1, badgeCol);
+    ctx.fillStyle = bg; ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, br * 1.18, 0, 6.283);
+    ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '900 ' + Math.round(t.badge * 0.55) + 'px "Trebuchet MS",sans-serif';
+    ctx.fillText(LETTERS[i], cx, cy + 1);
+
+    /* teks jawaban */
+    ctx.textAlign = 'left';
+    ctx.font = '800 ' + t.fs + 'px "Trebuchet MS","Segoe UI",sans-serif';
+    var lh = t.fs * 1.22, startY = r.h / 2 - (t.lines.length - 1) * lh / 2;
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.lineJoin = 'round';
+    for (var k = 0; k < t.lines.length; k++) {
+      ctx.strokeText(t.lines[k], t.textX, startY + k * lh);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(t.lines[k], t.textX, startY + k * lh);
+    }
+    if (mark) {
+      ctx.textAlign = 'center';
+      ctx.font = '900 ' + Math.round(r.h * 0.34) + 'px "Trebuchet MS",sans-serif';
+      ctx.fillStyle = '#fff';
+      ctx.fillText(mark, r.w - r.h * 0.26, r.h / 2 + 1);
+    }
+    ctx.restore();
+  }
+
+  function drawTurret(now) {
+    var ang = Math.atan2(ptr.y - turret.y, ptr.x - turret.x);
+    ang = clamp(ang, -Math.PI + 0.25, -0.25);
+    ctx.save();
+    ctx.translate(turret.x, turret.y);
+    ctx.rotate(ang);
+    ctx.fillStyle = '#c7d2fe'; ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 2;
+    rrPath(0, -7, 46, 14, 5); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    ctx.beginPath(); ctx.arc(turret.x, turret.y, 22, Math.PI, 2 * Math.PI);
+    ctx.fillStyle = '#1e3a8a'; ctx.fill(); ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 3; ctx.stroke();
+    var mAge = now - muzzleAt;
+    if (mAge < 130) {
+      var mx = turret.x + Math.cos(ang) * 50, my = turret.y + Math.sin(ang) * 50;
+      var rad = 14 + 26 * (1 - mAge / 130);
+      var g = ctx.createRadialGradient(mx, my, 1, mx, my, rad);
+      g.addColorStop(0, 'rgba(255,255,255,.95)'); g.addColorStop(0.4, 'rgba(103,232,249,.7)'); g.addColorStop(1, 'rgba(34,211,238,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(mx, my, rad, 0, 6.283); ctx.fill();
+    }
+  }
+
+  function drawEffects(now) {
+    var i;
+    for (i = lasers.length - 1; i >= 0; i--) {
+      var l = lasers[i], a = now - l.t0;
+      if (a > 240) { lasers.splice(i, 1); continue; }
+      var f = 1 - a / 240;
+      ctx.save();
+      ctx.globalAlpha = f;
+      ctx.shadowColor = '#22d3ee'; ctx.shadowBlur = 16;
+      ctx.strokeStyle = '#a5f3fc'; ctx.lineWidth = 2 + 4 * f; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(l.x0, l.y0); ctx.lineTo(l.x1, l.y1); ctx.stroke();
+      ctx.restore();
+    }
+    for (i = particles.length - 1; i >= 0; i--) {
+      var p = particles[i], age = now - p.t0;
+      if (age > p.life) { particles.splice(i, 1); continue; }
+      var k = age / p.life;
+      var px = p.x + p.vx * age / 1000, py = p.y + p.vy * age / 1000 + 260 * (age / 1000) * (age / 1000);
+      ctx.globalAlpha = 1 - k;
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(px, py, p.size * (1 - k * 0.5), 0, 6.283); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    for (i = floats.length - 1; i >= 0; i--) {
+      var ft = floats[i], fa = now - ft.t0;
+      if (fa > 1000) { floats.splice(i, 1); continue; }
+      ctx.save();
+      ctx.globalAlpha = 1 - fa / 1000;
+      ctx.font = '900 ' + ft.size + 'px "Trebuchet MS",sans-serif';
+      ctx.textAlign = 'center'; ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(0,0,0,.7)';
+      ctx.strokeText(ft.text, ft.x, ft.y - fa * 0.05);
+      ctx.fillStyle = ft.color; ctx.fillText(ft.text, ft.x, ft.y - fa * 0.05);
+      ctx.restore();
+    }
+  }
+
+  function drawCrosshair(now) {
+    var armed = gestureActive && !forceMouse && handVisible && gesture.armed;
+    var col = armed ? '#4ade80' : (hoverIdx >= 0 ? '#fde047' : '#22d3ee');
+    var r = 24 + (hoverIdx >= 0 ? 4 : 0);
+    ctx.save();
+    ctx.translate(ptr.x, ptr.y);
+    ctx.lineCap = 'round';
+    for (var pass = 0; pass < 2; pass++) {
+      ctx.strokeStyle = pass === 0 ? 'rgba(0,0,0,.65)' : col;
+      ctx.lineWidth = pass === 0 ? 7 : 3.5;
+      if (pass === 1) { ctx.shadowColor = col; ctx.shadowBlur = 14; }
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, 6.283); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-r - 12, 0); ctx.lineTo(-r + 8, 0);
+      ctx.moveTo(r - 8, 0); ctx.lineTo(r + 12, 0);
+      ctx.moveTo(0, -r - 12); ctx.lineTo(0, -r + 8);
+      ctx.moveTo(0, r - 8); ctx.lineTo(0, r + 12);
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, 0, 3.5, 0, 6.283); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawGame(now) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    drawBackdrop(now);
+    if (state === 'menu') { return; }
+    hoverIdx = -1;
+    for (var i = 0; i < targets.length; i++) {
+      var t = targets[i];
+      var r = getTargetRect(i, now);
+      t.hover = state === 'playing' && !answerLocked && ptr.x >= r.x && ptr.x <= r.x + r.w && ptr.y >= r.y && ptr.y <= r.y + r.h;
+      if (t.hover) { hoverIdx = i; }
+    }
+    for (var j = 0; j < targets.length; j++) { drawTarget(targets[j], j, now); }
+    drawEffects(now);
+    drawTurret(now);
+    drawCrosshair(now);
+  }
+
+  /* =====================  EFEK  ===================== */
+  function spawnParticles(x, y, color, n) {
+    for (var i = 0; i < n; i++) {
+      if (particles.length > 140) { particles.shift(); }
+      var a = Math.random() * 6.283, sp = 80 + Math.random() * 260;
+      particles.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 80, life: 500 + Math.random() * 500, t0: performance.now(), color: color, size: 3 + Math.random() * 4 });
+    }
+  }
+  function addFloat(x, y, text, color, size) {
+    if (floats.length > 6) { floats.shift(); }
+    floats.push({ x: x, y: y, text: text, color: color, size: size || 28, t0: performance.now() });
+  }
+
+  /* =====================  HUD  ===================== */
+  function buildHearts() {
+    heartsEl.innerHTML = '';
+    for (var i = 0; i < START_LIVES; i++) {
+      var s = document.createElement('span');
+      s.className = 'heart'; s.textContent = '♥';
+      heartsEl.appendChild(s);
+    }
+    hudCache.lives = -1;
+  }
+  function updateHud() {
+    if (score !== hudCache.score) { hudScore.textContent = score; hudCache.score = score; }
+    var qs = Math.max(1, Math.min(qIndex + 1, TOTAL_Q)) + '/' + TOTAL_Q;
+    if (qs !== hudCache.q) { hudQ.textContent = qs; hudCache.q = qs; }
+    if (lives !== hudCache.lives) {
+      var hs = heartsEl.children;
+      for (var i = 0; i < hs.length; i++) {
+        var lost = i >= lives;
+        hs[i].classList.toggle('lost', lost);
+        hs[i].textContent = lost ? '♡' : '♥';
+      }
+      heartsEl.setAttribute('aria-label', 'Nyawa tersisa ' + lives);
+      hudCache.lives = lives;
+    }
+    var secs = Math.ceil(remainingMs / 1000);
+    if (secs !== hudCache.time) {
+      hudTime.textContent = secs;
+      timerCard.classList.toggle('low', secs <= 5);
+      hudCache.time = secs;
+    }
+    timerFill.style.transform = 'scaleX(' + clamp(remainingMs / Q_TIME, 0, 1).toFixed(3) + ')';
+    updateGestureStatus();
+  }
+
+  function computeStatus() {
+    if (!gestureActive || forceMouse) { return { key: 'mouse', cls: 'idle', text: 'MODE MOUSE: klik untuk menembak' }; }
+    if (!handVisible) { return { key: 'nohand', cls: 'bad', text: 'TANGAN TIDAK TERDETEKSI' }; }
+    if (gesture.state === 'READY') { return { key: 'ready', cls: 'ready', text: 'READY' }; }
+    if (gesture.state === 'FIRED') { return { key: 'fired', cls: 'fired', text: 'FIRED — angkat ibu jari (REARM)' }; }
+    if (gesture.state === 'NOTPOINT') { return { key: 'point', cls: 'warn', text: 'Luruskan jari telunjuk' }; }
+    return { key: 'notready', cls: 'warn', text: 'Angkat ibu jari untuk siap menembak' };
+  }
+  function updateGestureStatus() {
+    var s = computeStatus();
+    if (s.key !== statusKey) {
+      statusKey = s.key;
+      gChip.className = 'chip ' + s.cls;
+      gText.textContent = s.text;
+    }
+    var showMeter = gestureActive && !forceMouse;
+    meterWrap.classList.toggle('hidden', !showMeter);
+    if (showMeter) {
+      var mv = Math.round(clamp(gesture.metric / 1.2, 0, 1) * 100);
+      if (mv !== meterVal) {
+        meterVal = mv;
+        meterFill.style.width = mv + '%';
+        mkReady.style.left = (clamp(readyThresh / 1.2, 0, 1) * 100) + '%';
+        mkFire.style.left = (clamp(fireThresh / 1.2, 0, 1) * 100) + '%';
+      }
+    }
+  }
+
+  /* =====================  KAMERA  ===================== */
+  function cameraActive() {
+    return !!(stream && stream.getVideoTracks().some(function (t) { return t.readyState === 'live'; }) && video.videoWidth > 0);
+  }
+  function friendlyCameraError(err) {
+    var n = err && err.name ? err.name : '';
+    if (n === 'NotAllowedError' || n === 'SecurityError' || n === 'PermissionDeniedError') {
+      return 'Izin kamera ditolak. Klik ikon kamera atau gembok di bilah alamat browser, pilih “Izinkan”, lalu tekan Coba Lagi. Jika game dibuka di dalam pratinjau/kanvas yang membatasi kamera, buka di tab baru. Kamu juga bisa bermain dengan mouse.';
+    }
+    if (n === 'NotFoundError' || n === 'DevicesNotFoundError' || n === 'OverconstrainedError') {
+      return 'Webcam tidak ditemukan. Sambungkan webcam lalu tekan Coba Lagi, atau bermain dengan mouse.';
+    }
+    if (n === 'NotReadableError' || n === 'TrackStartError' || n === 'AbortError') {
+      return 'Kamera sedang dipakai aplikasi lain (misalnya Zoom, Meet, atau tab lain). Tutup aplikasi itu lalu tekan Coba Lagi, atau bermain dengan mouse.';
+    }
+    if (n === 'NoStream') { return 'Kamera tidak mengirim gambar. Coba cabut dan pasang kembali webcam, lalu tekan Coba Lagi.'; }
+    if (n === 'Unsupported') { return 'Browser atau halaman ini tidak mendukung akses webcam (butuh HTTPS atau localhost). Silakan bermain dengan mouse.'; }
+    return 'Kamera belum dapat dinyalakan. Periksa izin dan sambungan webcam, lalu tekan Coba Lagi, atau bermain dengan mouse.';
+  }
+  function waitForVideo() {
+    return new Promise(function (resolve, reject) {
+      if (video.readyState >= 2 && video.videoWidth > 0) { resolve(); return; }
+      var done = false;
+      var to = setTimeout(function () { if (!done) { done = true; reject({ name: 'NoStream' }); } }, 8000);
+      function ok() {
+        if (done || !(video.videoWidth > 0)) { return; }
+        done = true; clearTimeout(to);
+        video.removeEventListener('loadeddata', ok);
+        video.removeEventListener('playing', ok);
+        resolve();
+      }
+      video.addEventListener('loadeddata', ok);
+      video.addEventListener('playing', ok);
+    });
+  }
+  function startCamera() {
+    if (cameraActive()) { return Promise.resolve({ ok: true }); }
+    if (cameraPromise) { return cameraPromise; }
+    cameraPromise = (async function () {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { throw { name: 'Unsupported' }; }
+        stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: false });
+        stream.getVideoTracks().forEach(function (t) { t.addEventListener('ended', handleCameraLost); });
+        video.srcObject = stream;
+        var pp = video.play();
+        if (pp && pp.catch) { pp.catch(function () {}); }
+        await waitForVideo();
+        if (!cameraActive()) { throw { name: 'NoStream' }; }
+        video.classList.add('on');
+        return { ok: true };
+      } catch (err) {
+        stopCamera();
+        return { ok: false, message: friendlyCameraError(err) };
+      } finally {
+        cameraPromise = null;
+      }
+    })();
+    return cameraPromise;
+  }
+  function stopCamera() {
+    stopGestureLoop();
+    if (stream) {
+      stream.getTracks().forEach(function (t) { t.removeEventListener('ended', handleCameraLost); try { t.stop(); } catch (e) { /* ignore */ } });
+    }
+    stream = null;
+    video.srcObject = null;
+    video.classList.remove('on');
+    handVisible = false;
+  }
+  function handleCameraLost() {
+    stopCamera();
+    resetGesture();
+    if (state !== 'menu') { toast('Kamera terputus. Permainan lanjut dengan mouse.', 5000); }
+  }
+
+  /* =====================  MEDIAPIPE  ===================== */
+  function withTimeout(p, ms) {
+    return new Promise(function (resolve, reject) {
+      var to = setTimeout(function () { reject(new Error('timeout')); }, ms);
+      p.then(function (v) { clearTimeout(to); resolve(v); }, function (e) { clearTimeout(to); reject(e); });
+    });
+  }
+  function loadMediaPipeScript() {
+    if (typeof window.Hands === 'function') { return Promise.resolve(); }
+    if (mpScriptPromise) { return mpScriptPromise; }
+    mpScriptPromise = new Promise(function (resolve, reject) {
+      var old = document.getElementById('mpScript');
+      if (old) { old.remove(); }
+      var s = document.createElement('script');
+      s.id = 'mpScript';
+      s.src = MP_BASE + 'hands.js';
+      s.crossOrigin = 'anonymous';
+      var to = setTimeout(function () { reject(new Error('timeout')); }, 20000);
+      s.onload = function () { clearTimeout(to); resolve(); };
+      s.onerror = function () { clearTimeout(to); reject(new Error('load')); };
+      document.head.appendChild(s);
+    }).catch(function (e) { mpScriptPromise = null; throw e; });
+    return mpScriptPromise;
+  }
+  function initMediaPipe() {
+    if (handsReady) { return Promise.resolve({ ok: true }); }
+    if (mpPromise) { return mpPromise; }
+    mpPromise = (async function () {
+      try {
+        await loadMediaPipeScript();
+        if (typeof window.Hands !== 'function') { throw new Error('nolib'); }
+        if (!hands) {
+          hands = new window.Hands({ locateFile: function (f) { return MP_BASE + f; } });
+          hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.55, minTrackingConfidence: 0.55, selfieMode: false });
+          hands.onResults(onHandResults);
+        }
+        await withTimeout(hands.initialize(), 60000);
+        handsReady = true;
+        return { ok: true };
+      } catch (e) {
+        console.warn('MediaPipe gagal dimuat:', e);
+        try { if (hands && hands.close) { hands.close(); } } catch (e2) { /* ignore */ }
+        hands = null; handsReady = false;
+        return { ok: false, message: 'Kontrol gestur tidak dapat dimuat (koneksi internet atau CDN MediaPipe bermasalah). Periksa koneksi lalu tekan Coba Lagi, atau bermain dengan mouse — game tetap bisa dimainkan.' };
+      } finally {
+        mpPromise = null;
+      }
+    })();
+    return mpPromise;
+  }
+
+  function startGestureLoop() {
+    if (gestureActive) { return; }
+    gestureActive = true; sendErrors = 0;
+    gestureTimer = setTimeout(gestureTick, 30);
+  }
+  function stopGestureLoop() {
+    gestureActive = false;
+    clearTimeout(gestureTimer);
+    gestureTimer = 0;
+  }
+  async function gestureTick() {
+    gestureTimer = 0;
+    if (!gestureActive) { return; }
+    var now = performance.now();
+    var wantFrames = (state === 'calibrating' || state === 'playing' || state === 'feedback');
+    if (!processing && wantFrames && !forceMouse && handsReady && !document.hidden && video.readyState >= 2 && video.videoWidth > 0 && now - lastSend >= 40) {
+      processing = true; lastSend = now;
+      try {
+        var pw = 384, ph = Math.max(2, Math.round(pw * video.videoHeight / video.videoWidth));
+        if (procCanvas.width !== pw || procCanvas.height !== ph) { procCanvas.width = pw; procCanvas.height = ph; }
+        procAspect = pw / ph;
+        procCtx.drawImage(video, 0, 0, pw, ph);
+        await hands.send({ image: procCanvas });
+        sendErrors = 0;
+      } catch (e) {
+        sendErrors++;
+        if (sendErrors >= 5) {
+          console.warn('Pengenalan gestur berhenti:', e);
+          stopGestureLoop();
+          toast('Kontrol gestur berhenti bekerja. Lanjutkan dengan mouse.', 5000);
+        }
+      } finally {
+        processing = false;
+      }
+    }
+    if (gestureActive) { gestureTimer = setTimeout(gestureTick, 16); }
+  }
+
+  /* =====================  GESTUR  ===================== */
+  function ldist(a, b) {
+    var dx = (a.x - b.x) * procAspect, dy = a.y - b.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  function resetGesture() {
+    gesture.armed = false; gesture.locked = false; gesture.stableUp = 0;
+    gesture.state = 'NOTREADY'; gesture.pointing = false;
+  }
+
+  function detectShootGesture(lm) {
+    var res = { valid: false, fired: false, pointing: false, metric: 0, state: 'NOTREADY' };
+    var now = performance.now();
+    if (!lm || lm.length < 21) { gesture.stableUp = 0; return res; }
+    var hs = ldist(lm[0], lm[9]);
+    var inFrame = lm[0].x > -0.02 && lm[0].x < 1.02 && lm[4].x > -0.02 && lm[4].x < 1.02 && lm[4].y > -0.02 && lm[4].y < 1.02 && lm[8].y > -0.05;
+    if (hs < 0.05 || !inFrame) { gesture.stableUp = 0; gesture.state = 'NOTREADY'; res.state = gesture.state; return res; }
+    res.valid = true;
+    /* telunjuk lurus: ujung (8) lebih jauh dari pergelangan daripada sendi PIP (6) */
+    var d8 = ldist(lm[0], lm[8]), d6 = ldist(lm[0], lm[6]);
+    res.pointing = d8 > d6 * 1.05 && d8 > hs * 1.3;
+    /* posisi ibu jari: jarak ujung ibu jari (4) ke pangkal telunjuk (5), relatif ukuran tangan.
+       Landmark 2 dan 3 dipakai sebagai pemeriksaan: ibu jari harus cukup jelas terlihat (bukan tersembunyi). */
+    var thumbLen = ldist(lm[2], lm[3]) + ldist(lm[3], lm[4]);
+    var metric = ldist(lm[4], lm[5]) / hs;
+    res.metric = metric;
+    gesture.metric = metric;
+    gesture.pointing = res.pointing;
+    if (thumbLen < hs * 0.25) { gesture.stableUp = 0; gesture.state = 'NOTREADY'; res.state = gesture.state; return res; }
+    if (!res.pointing) {
+      gesture.stableUp = 0;
+      gesture.state = 'NOTPOINT';
+      res.state = gesture.state;
+      return res;
+    }
+    if (gesture.armed) {
+      if (metric <= fireThresh) {
+        gesture.armed = false; gesture.locked = true; gesture.stableUp = 0; gesture.lastFire = now;
+        gesture.state = 'FIRED'; res.fired = true;
+      } else {
+        gesture.state = 'READY';
+      }
+    } else {
+      if (metric >= readyThresh) {
+        gesture.stableUp++;
+        if (gesture.stableUp >= 3 && now - gesture.lastFire > 250) {
+          gesture.armed = true; gesture.locked = false; gesture.state = 'READY';
+        }
+      } else {
+        gesture.stableUp = 0;
+      }
+      if (!gesture.armed) { gesture.state = gesture.locked ? 'FIRED' : 'NOTREADY'; }
+    }
+    res.state = gesture.state;
+    return res;
+  }
+
+  function mapHandToScreen(p) {
+    var m = 0.12;
+    var nx = clamp((1 - p.x - m) / (1 - 2 * m), 0, 1);
+    var ny = clamp((p.y - m) / (1 - 2 * m), 0, 1);
+    return { x: clamp(nx * W, 8, W - 8), y: clamp(ny * H, 8, H - 8) };
+  }
+
+  function onHandResults(results) {
+    if (!gestureActive || forceMouse) { return; }
+    var lm = results && results.multiHandLandmarks && results.multiHandLandmarks[0];
+    if (!lm) { return; }
+    var now = performance.now();
+    lastHandSeen = now; handVisible = true;
+    var g = detectShootGesture(lm);
+    if (g.valid && g.pointing && now - lastMouseMove > 1500) {
+      var m = mapHandToScreen(lm[8]);
+      if (Math.hypot(m.x - ptr.tx, m.y - ptr.ty) > DEAD_ZONE) { ptr.tx = m.x; ptr.ty = m.y; }
+    }
+    if (state === 'calibrating' && g.valid && g.pointing && g.metric > 0.3) { calibSamples.push(g.metric); }
+    if (g.fired && state === 'playing' && !answerLocked) {
+      var p = pointerAt(now - 100);
+      handleShoot(p.x, p.y, 'gesture');
+    }
+  }
+  function pointerAt(t) {
+    for (var i = ptrHistory.length - 1; i >= 0; i--) {
+      if (ptrHistory[i].t <= t) { return ptrHistory[i]; }
+    }
+    return ptrHistory.length ? ptrHistory[0] : { x: ptr.x, y: ptr.y };
+  }
+
+  /* =====================  KALIBRASI  ===================== */
+  function startCalibration() {
+    state = 'calibrating';
+    calibSamples = [];
+    calibEnd = performance.now() + CALIB_MS;
+    show(calibEl);
+    qtext.textContent = 'Bersiap... arahkan telunjuk ke depan dan angkat ibu jari.';
+  }
+  function finishCalibration(skipped) {
+    hide(calibEl);
+    calibrated = true;
+    var msg = '';
+    if (!skipped && calibSamples.length >= 8) {
+      var arr = calibSamples.slice().sort(function (a, b) { return a - b; });
+      var ref = arr[Math.floor(arr.length / 2)];
+      if (ref >= 0.5 && ref <= 1.6) {
+        readyThresh = clamp(ref * 0.85, 0.45, 1.0);
+        fireThresh = clamp(ref * 0.55, 0.18, readyThresh - 0.15);
+        msg = 'Kalibrasi selesai. Siap menembak!';
+      }
+    }
+    if (!msg) {
+      readyThresh = DEFAULT_READY; fireThresh = DEFAULT_FIRE;
+      msg = 'Kalibrasi dilewati: memakai pengaturan standar. Mouse selalu bisa dipakai.';
+    }
+    meterVal = -1;
+    resetGesture();
+    toast(msg, 3000);
+    nextQuestion();
+  }
+
+  /* =====================  ALUR GAME  ===================== */
+  function initGame() {
+    if (initialized) { return; }
+    initialized = true;
+    validateQuestions();
+    buildIllustrations();
+    buildHearts();
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+    document.addEventListener('visibilitychange', function () { if (document.hidden && (state === 'playing' || state === 'feedback')) { pauseGame(); } });
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('click', function (e) {
+      var b = e.target && e.target.closest ? e.target.closest('button') : null;
+      if (b) { ensureAudio(); b.blur(); }
+    });
+
+    stage.addEventListener('pointermove', function (e) {
+      var r = stage.getBoundingClientRect();
+      var x = clamp(e.clientX - r.left, 0, W), y = clamp(e.clientY - r.top, 0, H);
+      ptr.tx = ptr.x = x; ptr.ty = ptr.y = y;
+      lastMouseMove = performance.now();
+    });
+    canvas.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'mouse' && e.button !== 0) { return; }
+      ensureAudio();
+      var r = stage.getBoundingClientRect();
+      var x = clamp(e.clientX - r.left, 0, W), y = clamp(e.clientY - r.top, 0, H);
+      ptr.tx = ptr.x = x; ptr.ty = ptr.y = y;
+      lastMouseMove = performance.now();
+      handleShoot(x, y, 'mouse');
+    });
+    canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+    $('btnStart').addEventListener('click', function () { openHow('start'); });
+    $('btnMenuHow').addEventListener('click', function () { openHow('info'); });
+    $('btnMenuMouse').addEventListener('click', function () { beginSession(false); });
+    $('howStart').addEventListener('click', function () { beginSession(true); });
+    $('howMouse').addEventListener('click', function () { beginSession(false); });
+    $('howClose').addEventListener('click', closeHow);
+    $('btnLoadCancel').addEventListener('click', function () { beginSession(false); });
+    $('probRetry').addEventListener('click', function () { beginSession(true); });
+    $('probMouse').addEventListener('click', function () { beginSession(false); });
+    $('probMenu').addEventListener('click', function () { cleanupGame(true); });
+    btnPause.addEventListener('click', function () { if (state === 'paused') { resumeGame(); } else { pauseGame(); } });
+    $('btnResume').addEventListener('click', resumeGame);
+    $('btnPauseHow').addEventListener('click', function () { openHow('info'); });
+    $('btnPauseExit').addEventListener('click', function () { cleanupGame(true); });
+    $('btnExit').addEventListener('click', function () { cleanupGame(true); });
+    $('btnAgain').addEventListener('click', restartGame);
+    $('btnToMenu').addEventListener('click', function () { cleanupGame(true); });
+    $('btnCalibSkip').addEventListener('click', function () { if (state === 'calibrating') { finishCalibration(true); } });
+    btnFull.addEventListener('click', toggleFullscreen);
+    btnSound.addEventListener('click', function () {
+      soundOn = !soundOn;
+      btnSound.textContent = soundOn ? '🔊 Suara' : '🔇 Suara mati';
+      btnSound.setAttribute('aria-pressed', String(soundOn));
+    });
+    btnMouse.addEventListener('click', function () {
+      if (!gestureActive) { toast('Kamera/gestur sedang tidak aktif, jadi kamu sudah memakai mouse. Untuk gestur, kembali ke menu lalu tekan MULAI GAME.', 4500); return; }
+      forceMouse = !forceMouse;
+      updateMouseButton();
+      resetGesture();
+      toast(forceMouse ? 'Mode mouse aktif. Klik kiri untuk menembak.' : 'Kontrol gestur aktif kembali.', 2500);
+    });
+
+    loadMediaPipeScript().catch(function () { /* akan dicoba lagi saat Mulai Game */ });
+    lastFrameTs = performance.now();
+    if (!rafId) { rafId = requestAnimationFrame(frame); }
+  }
+
+  function updateMouseButton() {
+    if (gestureActive && forceMouse) { btnMouse.textContent = '🖐 Pakai Gestur Tangan'; btnMouse.classList.add('on'); }
+    else { btnMouse.textContent = '🖱 Gunakan Mouse'; btnMouse.classList.remove('on'); }
+  }
+
+  function openHow(mode) {
+    howMode = mode;
+    $('howStart').classList.toggle('hidden', mode !== 'start');
+    $('howMouse').classList.toggle('hidden', mode !== 'start');
+    $('howClose').classList.toggle('hidden', mode === 'start');
+    show(modalHow);
+  }
+  function closeHow() { hide(modalHow); }
+
+  function showProblem(title, msg) {
+    $('probTitle').textContent = title;
+    $('probMsg').textContent = msg;
+    show(screenProblem);
+  }
+
+  async function beginSession(wantCamera) {
+    ensureAudio();
+    var token = ++sessionToken;
+    hide(screenMenu); hide(modalHow); hide(screenProblem); hide(screenResult); hide(screenLoading);
+    if (!wantCamera) {
+      stopGestureLoop();
+      forceMouse = false;
+      startGame();
+      return;
+    }
+    $('loadText').textContent = 'Meminta izin kamera...';
+    show(screenLoading);
+    var cam = await startCamera();
+    if (token !== sessionToken) { return; }
+    if (!cam.ok) { hide(screenLoading); showProblem('Kamera belum bisa dipakai', cam.message); return; }
+    $('loadText').textContent = 'Memuat kontrol gestur tangan...';
+    var mp = await initMediaPipe();
+    if (token !== sessionToken) { return; }
+    hide(screenLoading);
+    if (!mp.ok) { showProblem('Kontrol gestur belum bisa dimuat', mp.message); return; }
+    forceMouse = false;
+    startGestureLoop();
+    startGame();
+  }
+
+  function buildSession() {
+    return QUESTIONS.map(function (q) {
+      var items = q.options.map(function (text, idx) { return { text: text, correct: idx === q.answer }; });
+      var mixed = shuffle(items);
+      var ans = 0;
+      mixed.forEach(function (it, idx) { if (it.correct) { ans = idx; } });
+      return { question: q.question, options: mixed.map(function (it) { return it.text; }), answer: ans, explanation: q.explanation };
+    });
+  }
+
+  function resetSessionState() {
+    session = buildSession();
+    qIndex = -1; score = 0; lives = START_LIVES; correctCount = 0; wrongCount = 0; timeoutCount = 0;
+    answerLocked = false; remainingMs = Q_TIME; deadline = 0; feedbackUntil = 0; pausedFrom = null;
+    targets = []; particles = []; lasers = []; floats = [];
+    lastShotAt = 0; muzzleAt = -9999; hoverIdx = -1;
+    resetGesture();
+    hudCache = { score: -1, q: '', time: -1, lives: -1 };
+    flashEl.className = '';
+    stage.classList.remove('shake');
+    hide(fbEl);
+    hide(calibEl);
+  }
+
+  function startGame() {
+    resetSessionState();
+    show(ui);
+    updateMouseButton();
+    qtext.textContent = 'Bersiap...';
+    if (gestureActive && handsReady && !calibrated) { startCalibration(); }
+    else { nextQuestion(); }
+    layoutTargets();
+  }
+
+  function nextQuestion() {
+    qIndex++;
+    answerLocked = false;
+    var q = session[qIndex];
+    qtext.textContent = q.question;
+    qpanel.classList.remove('enter'); void qpanel.offsetWidth; qpanel.classList.add('enter');
+    hide(fbEl);
+    targets = q.options.map(function (text, i) {
+      return { text: text, letter: LETTERS[i], state: 'idle', hitAt: 0, hover: false, x: 0, y: 0, w: 100, h: 60, lines: [text], fs: 18, badge: 40, pad: 8, textX: 60, textW: 80 };
+    });
+    layoutTargets();
+    var now = performance.now();
+    qStartAt = now;
+    remainingMs = Q_TIME;
+    deadline = now + Q_TIME;
+    state = 'playing';
+  }
+
+  function updateTimer(now) {
+    if (state === 'playing') {
+      remainingMs = Math.max(0, deadline - now);
+      if (remainingMs <= 0 && !answerLocked) { handleTimeout(); }
+    } else if (state === 'feedback') {
+      if (now >= feedbackUntil) { afterFeedback(); }
+    } else if (state === 'calibrating') {
+      var left = Math.max(0, calibEnd - now);
+      var c = String(Math.ceil(left / 1000));
+      if ($('calibCnt').textContent !== c) { $('calibCnt').textContent = c; }
+      if (left <= 0) { finishCalibration(false); }
+    }
+  }
+
+  function checkTargetHit(x, y) {
+    var now = performance.now();
+    for (var i = 0; i < targets.length; i++) {
+      var r = getTargetRect(i, now);
+      if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) { return i; }
+    }
+    return -1;
+  }
+
+  function handleShoot(x, y, source) {
+    if (state !== 'playing' || answerLocked) { return false; }
+    var now = performance.now();
+    if (now - lastShotAt < 180) { return false; }
+    lastShotAt = now;
+    playShootSound();
+    muzzleAt = now;
+    var ang = clamp(Math.atan2(y - turret.y, x - turret.x), -Math.PI + 0.25, -0.25);
+    if (lasers.length > 8) { lasers.shift(); }
+    lasers.push({ x0: turret.x + Math.cos(ang) * 50, y0: turret.y + Math.sin(ang) * 50, x1: x, y1: y, t0: now });
+    var idx = checkTargetHit(x, y);
+    if (idx < 0) {
+      spawnParticles(x, y, '#94a3b8', 5);
+      addFloat(x, y - 30, 'Meleset!', '#cbd5e1', 22);
+      return true;
+    }
+    handleAnswer(idx, x, y);
+    return true;
+  }
+
+  function handleAnswer(idx, x, y) {
+    if (answerLocked || state !== 'playing') { return; }
+    answerLocked = true;
+    var q = session[qIndex];
+    var now = performance.now();
+    var correct = idx === q.answer;
+    targets[idx].state = correct ? 'correct' : 'wrong';
+    targets[idx].hitAt = now;
+    if (correct) {
+      score += POINTS; correctCount++;
+      playCorrectSound();
+      spawnParticles(x, y, '#4ade80', 26);
+      spawnParticles(x, y, '#fde047', 10);
+      addFloat(x, y - 30, '+' + POINTS, '#86efac', 34);
+    } else {
+      lives--; wrongCount++;
+      targets[q.answer].state = 'reveal';
+      targets[q.answer].hitAt = now;
+      playWrongSound();
+      spawnParticles(x, y, '#f87171', 22);
+      addFloat(x, y - 30, '−1 nyawa', '#fca5a5', 28);
+      triggerShake();
+    }
+    showFeedback(correct ? 'correct' : 'wrong', q);
+  }
+
+  function handleTimeout() {
+    if (answerLocked || state !== 'playing') { return; }
+    answerLocked = true;
+    var q = session[qIndex];
+    var now = performance.now();
+    lives--; timeoutCount++;
+    targets[q.answer].state = 'reveal';
+    targets[q.answer].hitAt = now;
+    playTimeoutSound();
+    addFloat(W / 2, H / 2, 'Waktu habis!', '#fde68a', 40);
+    showFeedback('timeout', q);
+  }
+
+  function showFeedback(kind, q) {
+    state = 'feedback';
+    feedbackUntil = performance.now() + FEEDBACK_MS;
+    var letter = LETTERS[q.answer];
+    var txt;
+    if (kind === 'correct') { txt = '✔ BENAR! +' + POINTS + ' poin. ' + q.explanation; }
+    else if (kind === 'wrong') { txt = '✖ BELUM TEPAT (nyawa −1). Jawaban benar: ' + letter + '. ' + q.explanation; }
+    else { txt = '⏰ WAKTU HABIS (nyawa −1). Jawaban benar: ' + letter + '. ' + q.explanation; }
+    fbEl.textContent = txt;
+    fbEl.className = (kind === 'correct' ? 'ok' : 'bad') + ' pop';
+    triggerFlash(kind === 'correct' ? 'ok' : 'bad');
+    updateHud();
+  }
+
+  function afterFeedback() {
+    if (lives <= 0 || qIndex >= TOTAL_Q - 1) { endGame(); }
+    else { nextQuestion(); }
+  }
+
+  function endGame() {
+    state = 'gameover';
+    hide(fbEl);
+    var pct = Math.round(correctCount / TOTAL_Q * 100);
+    $('rScore').textContent = score;
+    $('rCorrect').textContent = correctCount;
+    $('rWrong').textContent = wrongCount;
+    $('rUn').textContent = TOTAL_Q - correctCount - wrongCount;
+    $('rPct').textContent = pct + '%';
+    var m;
+    if (pct >= 80) { m = 'Luar biasa! Kamu menguasai tata surya seperti astronot sejati. Pertahankan semangat belajarmu!'; }
+    else if (pct >= 50) { m = 'Hebat! Kamu sudah paham banyak tentang tata surya. Ayo coba lagi untuk skor yang lebih tinggi!'; }
+    else { m = 'Terima kasih sudah berpetualang! Setiap misi menambah ilmu baru. Yuk coba lagi, kamu pasti bisa lebih baik!'; }
+    $('rMsg').textContent = m;
+    playGameOverSound();
+    show(screenResult);
+  }
+
+  function pauseGame() {
+    if (state !== 'playing' && state !== 'feedback') { return; }
+    var now = performance.now();
+    pausedFrom = state;
+    pauseRemaining = (state === 'playing' ? deadline : feedbackUntil) - now;
+    if (pauseRemaining < 0) { pauseRemaining = 0; }
+    state = 'paused';
+    btnPause.textContent = '▶ Lanjut';
+    show(screenPause);
+  }
+  function resumeGame() {
+    if (state !== 'paused') { return; }
+    hide(modalHow);
+    hide(screenPause);
+    var now = performance.now();
+    if (pausedFrom === 'playing') { deadline = now + pauseRemaining; remainingMs = pauseRemaining; }
+    else { feedbackUntil = now + pauseRemaining; }
+    state = pausedFrom || 'playing';
+    pausedFrom = null;
+    btnPause.textContent = '⏸ Jeda';
+    resetGesture();
+    lastShotAt = now;
+  }
+
+  function restartGame() {
+    hide(screenResult);
+    hide(screenPause);
+    btnPause.textContent = '⏸ Jeda';
+    startGame();
+  }
+
+  function cleanupGame(stopCam) {
+    sessionToken++;
+    state = 'menu';
+    answerLocked = false; pausedFrom = null;
+    targets = []; particles = []; lasers = []; floats = [];
+    clearTimeout(toastTimer); toastEl.classList.remove('show');
+    flashEl.className = ''; stage.classList.remove('shake');
+    btnPause.textContent = '⏸ Jeda';
+    hide(ui); hide(calibEl); hide(screenPause); hide(screenResult); hide(modalHow); hide(screenLoading); hide(screenProblem);
+    resetGesture();
+    if (stopCam) { stopCamera(); calibrated = false; readyThresh = DEFAULT_READY; fireThresh = DEFAULT_FIRE; }
+    forceMouse = false;
+    statusKey = '';
+    show(screenMenu);
+  }
+
+  /* =====================  INPUT LAIN  ===================== */
+  function onKeyDown(e) {
+    if (e.key === 'Escape') {
+      if (!modalHow.classList.contains('hidden')) { closeHow(); return; }
+      if (state === 'playing' || state === 'feedback') { pauseGame(); }
+      else if (state === 'paused') { resumeGame(); }
+      return;
+    }
+    if (state === 'playing') {
+      var step = 34, moved = false;
+      if (e.key === 'ArrowLeft') { ptr.tx = ptr.x = clamp(ptr.x - step, 0, W); moved = true; }
+      else if (e.key === 'ArrowRight') { ptr.tx = ptr.x = clamp(ptr.x + step, 0, W); moved = true; }
+      else if (e.key === 'ArrowUp') { ptr.ty = ptr.y = clamp(ptr.y - step, 0, H); moved = true; }
+      else if (e.key === 'ArrowDown') { ptr.ty = ptr.y = clamp(ptr.y + step, 0, H); moved = true; }
+      if (moved) { lastMouseMove = performance.now(); e.preventDefault(); return; }
+      if (e.code === 'Space' && !(e.target && e.target.tagName === 'BUTTON')) { e.preventDefault(); ensureAudio(); handleShoot(ptr.x, ptr.y, 'keyboard'); return; }
+    }
+    if ((e.key === 'p' || e.key === 'P') && (state === 'playing' || state === 'feedback')) { pauseGame(); }
+  }
+
+  function toggleFullscreen() {
+    var el = document.documentElement;
+    var isFull = document.fullscreenElement || document.webkitFullscreenElement;
+    try {
+      var p;
+      if (isFull) { p = (document.exitFullscreen || document.webkitExitFullscreen).call(document); }
+      else if (el.requestFullscreen || el.webkitRequestFullscreen) { p = (el.requestFullscreen || el.webkitRequestFullscreen).call(el); }
+      else { toast('Browser ini tidak mendukung layar penuh. Game tetap bisa dimainkan.', 3000); }
+      if (p && p.catch) { p.catch(function () { toast('Layar penuh tidak diizinkan, game tetap berjalan normal.', 3000); }); }
+    } catch (err) { toast('Layar penuh tidak tersedia, game tetap berjalan normal.', 3000); }
+  }
+  function onFullscreenChange() {
+    var isFull = document.fullscreenElement || document.webkitFullscreenElement;
+    btnFull.textContent = isFull ? '⛶ Keluar Layar Penuh' : '⛶ Layar Penuh';
+    setTimeout(resizeCanvas, 60);
+    if (!isFull && (state === 'playing' || state === 'feedback')) { pauseGame(); }
+  }
+
+  /* =====================  LOOP RENDER (satu-satunya rAF)  ===================== */
+  function frame() {
+    rafId = requestAnimationFrame(frame);
+    var now = performance.now();
+    var dt = Math.min(60, now - lastFrameTs);
+    lastFrameTs = now;
+    updateTimer(now);
+    if (gestureActive && handVisible && now - lastHandSeen > 450) { handVisible = false; resetGesture(); }
+    var k = 1 - Math.pow(1 - LERP, dt / 16.67);
+    ptr.x += (ptr.tx - ptr.x) * k;
+    ptr.y += (ptr.ty - ptr.y) * k;
+    ptrHistory.push({ t: now, x: ptr.x, y: ptr.y });
+    while (ptrHistory.length > 2 && ptrHistory[0].t < now - 600) { ptrHistory.shift(); }
+    drawGame(now);
+    if (state !== 'menu') { updateHud(); }
+  }
+
+  /* =====================  START  ===================== */
+  initGame();
+})();
+</script>
+</body>
+</html>
